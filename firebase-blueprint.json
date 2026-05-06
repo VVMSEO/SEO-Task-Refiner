@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A refined SEO task from a checklist item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "mode": { "type": "string", "enum": ["refine", "split", "kanban", "audit"] },
+        "inputText": { "type": "string" },
+        "outputText": { "type": "string" },
+        "outputParsed": { "type": "object" },
+        "isFavorite": { "type": "boolean" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "tokensUsed": { "type": "number" },
+        "modelUsed": { "type": "string" }
+      },
+      "required": ["id", "mode", "inputText", "outputText", "outputParsed", "isFavorite", "tags", "createdAt", "tokensUsed", "modelUsed"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with limits and usage",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "totalRequests": { "type": "number" },
+        "totalTokens": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "displayName", "totalRequests", "totalTokens", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "User's processed tasks"
+    },
+    "/users/{userId}/profile/{profileId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User's profile settings (profileId is usually exactly 'main')"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'mode', 'inputText', 'outputText', 'outputParsed', 'isFavorite', 'tags', 'createdAt', 'tokensUsed', 'modelUsed'])
+        && data.keys().size() == 10
+        && data.id is string && data.id.size() <= 128
+        && data.mode in ['refine', 'split', 'kanban', 'audit']
+        && data.inputText is string && data.inputText.size() <= 10000
+        && data.outputText is string && data.outputText.size() <= 20000
+        && (data.outputParsed is map || data.outputParsed is list)
+        && data.isFavorite is bool
+        && data.tags is list && data.tags.size() <= 20
+        && data.createdAt is timestamp
+        && data.tokensUsed is number
+        && data.modelUsed is string && data.modelUsed.size() <= 128;
+    }
+
+    function isValidProfile(data) {
+      return data.keys().hasAll(['email', 'displayName', 'totalRequests', 'totalTokens', 'createdAt'])
+        && data.keys().size() == 5
+        && data.email is string && data.email.size() <= 256
+        && data.displayName is string && data.displayName.size() <= 128
+        && data.totalRequests is number
+        && data.totalTokens is number
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      // Prevent access to root user document unless needed, let's keep it closed
+      
+      match /profile/{profileId} {
+        // profileId usually "main"
+        allow get: if isVerified() && request.auth.uid == userId;
+        allow list: if false; // Only get "main" directly
+        allow create: if isVerified() && request.auth.uid == userId
+                      && profileId == 'main'
+                      && isValidProfile(incoming())
+                      && incoming().createdAt == request.time;
+        allow update: if isVerified() && request.auth.uid == userId
+                      && profileId == 'main'
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'totalRequests', 'totalTokens'])
+                      && incoming().email == existing().email // immutable
+                      && incoming().createdAt == existing().createdAt // immutable
+                      && incoming().totalRequests is number
+                      && incoming().totalTokens is number;
+      }
+
+      match /tasks/{taskId} {
+        allow get: if isVerified() && request.auth.uid == userId;
+        allow list: if isVerified() && request.auth.uid == userId;
+        
+        allow create: if isVerified() && request.auth.uid == userId
+                      && isValidId(taskId)
+                      && isValidTask(incoming())
+                      && incoming().id == taskId
+                      && incoming().createdAt == request.time;
+
+        allow update: if isVerified() && request.auth.uid == userId
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['isFavorite', 'tags'])
+                      && incoming().tags is list && incoming().tags.size() <= 20
+                      && incoming().isFavorite is bool;
+        
+        allow delete: if isVerified() && request.auth.uid == userId;
+      }
+    }
+  }
+}
