@@ -6,7 +6,6 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: '/seo-task-refiner/',
     plugins: [react(), tailwindcss()],
     build: {
       outDir: 'dist',
